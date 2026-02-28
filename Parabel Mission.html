@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>🎮 Parabel-Mission</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraph.css" />
+<script src="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraphcore.js"></script>
+
+<style>
+body{
+font-family:Segoe UI;
+background:linear-gradient(135deg,#4e73df,#1cc88a);
+margin:0;
+text-align:center;
+}
+
+h1{color:white;margin:20px;}
+
+.container{
+display:flex;
+justify-content:center;
+gap:20px;
+flex-wrap:wrap;
+}
+
+.card{
+background:white;
+border-radius:16px;
+box-shadow:0 6px 18px rgba(0,0,0,0.2);
+padding:20px;
+min-width:260px;
+transition:0.3s;
+}
+
+.glow{
+animation:glowEffect .8s ease-in-out;
+}
+
+@keyframes glowEffect{
+0%{box-shadow:0 0 0 gold;}
+50%{box-shadow:0 0 25px gold;}
+100%{box-shadow:0 0 0 gold;}
+}
+
+#board{
+width:800px;
+height:450px;
+margin:20px auto;
+background:white;
+border-radius:16px;
+}
+
+button{
+font-size:16px;
+padding:10px 18px;
+margin:6px;
+border:none;
+border-radius:10px;
+cursor:pointer;
+transition:.2s;
+}
+
+button:hover{transform:scale(1.05);}
+
+.startBtn{background:#36b9cc;color:white;}
+.checkBtn{background:#1cc88a;color:white;}
+.nextBtn{background:#f6c23e;}
+
+#score{
+font-size:28px;
+font-weight:bold;
+}
+
+.pop{animation:popEffect .4s ease;}
+
+@keyframes popEffect{
+0%{transform:scale(1);}
+50%{transform:scale(1.4);color:#1cc88a;}
+100%{transform:scale(1);}
+}
+
+#feedback{
+margin-top:10px;
+font-size:18px;
+}
+
+#hintBox{
+margin-top:10px;
+font-size:15px;
+background:#eef4ff;
+padding:8px;
+border-radius:8px;
+}
+
+canvas.confetti{
+position:fixed;
+pointer-events:none;
+top:0;
+left:0;
+}
+</style>
+</head>
+<body>
+
+<h1>🎯 Parabel-Mission</h1>
+
+<div class="container">
+
+<div class="card">
+<h2>🏆 Punkte</h2>
+<div id="score">0</div>
+<div id="level">Level 1</div>
+</div>
+
+<div class="card" id="taskCard">
+<h2>📋 Aufgabe</h2>
+<div id="taskText">Klicke auf Start</div>
+<div id="hintBox">💡 Tipps: —</div>
+</div>
+
+<div class="card">
+<h2>🎮 Steuerung</h2>
+<button class="startBtn" onclick="startGame()">▶ Start</button>
+<button class="checkBtn" onclick="checkAnswer()">✔ Prüfen</button>
+<button class="nextBtn" onclick="nextTask()">➡ Weiter</button>
+<button onclick="showHint()">💡 Tipp</button>
+<div id="feedback"></div>
+</div>
+
+</div>
+
+<div id="board" class="jxgbox"></div>
+
+<script>
+
+let board,a,b,c;
+let score=0;
+let currentTask=0;
+let solvedTasks=[];
+let hintLevel=0;
+
+const tasks=[
+{
+text:"Stelle f(x)=x² ein.",
+a:1,b:0,c:0,
+hints:[
+"Welche Zahl steht vor x²?",
+"Die Parabel ist normal nach oben geöffnet.",
+"a=1, b=0, c=0"
+]
+},
+{
+text:"Stelle f(x)=-x² ein.",
+a:-1,b:0,c:0,
+hints:[
+"Die Parabel öffnet sich nach unten.",
+"Nur a ist negativ.",
+"a=-1, b=0, c=0"
+]
+},
+{
+text:"Stelle f(x)=x²+2x ein.",
+a:1,b:2,c:0,
+hints:[
+"Es gibt keinen konstanten Term.",
+"Die Zahl vor x ist positiv.",
+"a=1, b=2, c=0"
+]
+},
+{
+text:"Stelle f(x)=x²-4x+3 ein.",
+a:1,b:-4,c:3,
+hints:[
+"Achte auf das Minus vor 4x.",
+"c verschiebt die Parabel nach oben.",
+"a=1, b=-4, c=3"
+]
+}
+];
+
+function initBoard(){
+board=JXG.JSXGraph.initBoard("board",{
+boundingbox:[-10,10,10,-10],
+axis:true
+});
+
+a=board.create("slider",[[-8,9],[-2,9],[-5,1,5]],{name:"a"});
+b=board.create("slider",[[-8,7],[-2,7],[-5,0,5]],{name:"b"});
+c=board.create("slider",[[-8,5],[-2,5],[-5,0,5]],{name:"c"});
+
+board.create("functiongraph",[
+function(x){
+return a.Value()*x*x + b.Value()*x + c.Value();
+}
+],{strokeWidth:3});
+}
+
+function resetGraph(){
+a.setValue(1);
+b.setValue(0);
+c.setValue(0);
+}
+
+function startGame(){
+score=0;
+currentTask=0;
+solvedTasks=[];
+hintLevel=0;
+
+document.getElementById("score").innerText=score;
+document.getElementById("feedback").innerHTML="";
+
+if(board) JXG.JSXGraph.freeBoard(board);
+initBoard();
+showTask();
+}
+
+function showTask(){
+document.getElementById("taskText").innerText=tasks[currentTask].text;
+document.getElementById("level").innerText="Level "+(currentTask+1);
+document.getElementById("hintBox").innerHTML="💡 Tipps: —";
+document.getElementById("feedback").innerHTML="";
+hintLevel=0;
+}
+
+function showHint(){
+let hints=tasks[currentTask].hints;
+
+document.getElementById("hintBox").innerHTML=
+"💡 Tipp "+(hintLevel+1)+" von "+hints.length+
+"<br><br>"+
+hints[hintLevel];
+
+hintLevel++;
+
+if(hintLevel>=hints.length){
+hintLevel=0; // zyklisch
+}
+}
+
+function checkAnswer(){
+let tol=0.1;
+
+if(
+Math.abs(a.Value()-tasks[currentTask].a)<tol &&
+Math.abs(b.Value()-tasks[currentTask].b)<tol &&
+Math.abs(c.Value()-tasks[currentTask].c)<tol
+){
+
+if(!solvedTasks.includes(currentTask)){
+score++;
+solvedTasks.push(currentTask);
+document.getElementById("score").innerText=score;
+animateSuccess();
+}
+
+document.getElementById("feedback").innerHTML="🎉 Richtig!";
+playCorrectSound();
+resetGraph();
+}
+else{
+document.getElementById("feedback").innerHTML="❌ Noch nicht korrekt.";
+playWrongSound();
+}
+}
+
+function nextTask(){
+currentTask++;
+
+if(currentTask>=tasks.length){
+document.getElementById("taskText").innerText="🏁 Spiel beendet!";
+document.getElementById("feedback").innerHTML=
+"Endpunktzahl: "+score+" / "+tasks.length;
+return;
+}
+
+showTask();
+resetGraph();
+}
+
+/* Animation */
+function animateSuccess(){
+document.getElementById("score").classList.add("pop");
+setTimeout(()=>document.getElementById("score").classList.remove("pop"),400);
+
+document.getElementById("taskCard").classList.add("glow");
+setTimeout(()=>document.getElementById("taskCard").classList.remove("glow"),800);
+
+launchConfetti();
+}
+
+/* Konfetti */
+function launchConfetti(){
+const canvas=document.createElement("canvas");
+canvas.classList.add("confetti");
+document.body.appendChild(canvas);
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+const ctx=canvas.getContext("2d");
+
+let pieces=[];
+for(let i=0;i<80;i++){
+pieces.push({
+x:Math.random()*canvas.width,
+y:Math.random()*canvas.height-canvas.height,
+size:5+Math.random()*5,
+speed:2+Math.random()*3
+});
+}
+
+function update(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+pieces.forEach(p=>{
+p.y+=p.speed;
+ctx.fillStyle=`hsl(${Math.random()*360},100%,50%)`;
+ctx.fillRect(p.x,p.y,p.size,p.size);
+});
+}
+
+let interval=setInterval(update,30);
+setTimeout(()=>{
+clearInterval(interval);
+document.body.removeChild(canvas);
+},1000);
+}
+
+/* Sounds */
+function playCorrectSound(){
+const ctx=new (window.AudioContext||window.webkitAudioContext)();
+const osc=ctx.createOscillator();
+const gain=ctx.createGain();
+
+osc.type="triangle";
+osc.frequency.setValueAtTime(600,ctx.currentTime);
+osc.frequency.exponentialRampToValueAtTime(900,ctx.currentTime+0.2);
+
+gain.gain.setValueAtTime(0.2,ctx.currentTime);
+gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.3);
+
+osc.connect(gain);
+gain.connect(ctx.destination);
+osc.start();
+osc.stop(ctx.currentTime+0.3);
+}
+
+function playWrongSound(){
+const ctx=new (window.AudioContext||window.webkitAudioContext)();
+const osc=ctx.createOscillator();
+const gain=ctx.createGain();
+
+osc.type="sawtooth";
+osc.frequency.setValueAtTime(200,ctx.currentTime);
+
+gain.gain.setValueAtTime(0.2,ctx.currentTime);
+gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4);
+
+osc.connect(gain);
+gain.connect(ctx.destination);
+osc.start();
+osc.stop(ctx.currentTime+0.4);
+}
+
+</script>
+
+</body>
+</html>
